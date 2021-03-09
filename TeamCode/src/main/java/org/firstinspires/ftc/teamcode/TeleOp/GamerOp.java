@@ -12,14 +12,12 @@ import java.util.concurrent.TimeUnit;
 public class GamerOp extends OpMode {
     private ElapsedTime runtime = new ElapsedTime();
     private DcMotorEx leftFront, leftBack, rightFront, rightBack, intake, shooter, wobbleArm, rampIntake, leftDead, rightDead, perpDead; //deadwheels will probably be set to a specific motor that's already being used
-    private Servo wobbleClaw, loader, retractor;
+    private Servo wobbleClaw, loader;
     private boolean precision, direction, precisionChanged;
     private boolean useOneGamepad=false;
     private double baseParallelRightPosition, baseParallelLeftPosition, basePerpendicularPosition,baseClawPosition;
     private boolean clawState=false; //claw position- false= open  true=closed
     private boolean clawStateChanged=false;
-    private boolean retractorState=false;//retractor position    false=up    true=down
-    private boolean retractorStateChanged=false;
     private final int deadWheelTicks = 4096; //is this per revolution?
     private final double WHEEL_CIRCUMFERENCE_IN = Math.PI*3.05; //circumference of parallel deadwheel
     private final double DEADWHEEL_INCHES_OVER_TICKS = WHEEL_CIRCUMFERENCE_IN/deadWheelTicks;
@@ -33,7 +31,7 @@ public class GamerOp extends OpMode {
         setUpIntake();
         setUpServos();
         setUpMotors();
-        lowerRetractor();
+
 
         precision = false;
         direction = false;
@@ -42,9 +40,9 @@ public class GamerOp extends OpMode {
 
         telemetry.addData("Status", "Initialized");
 
-        baseParallelLeftPosition = leftDead.getCurrentPosition();
-        baseParallelRightPosition = rightDead.getCurrentPosition(); //deadwheels, but name prob needs changing when plugged into hub
-        basePerpendicularPosition = perpDead.getCurrentPosition();
+//        baseParallelLeftPosition = leftDead.getCurrentPosition();
+//        baseParallelRightPosition = rightDead.getCurrentPosition(); //deadwheels, but name prob needs changing when plugged into hub
+//        basePerpendicularPosition = perpDead.getCurrentPosition();
 
         baseClawPosition=wobbleArm.getCurrentPosition();
     }
@@ -82,12 +80,10 @@ public class GamerOp extends OpMode {
 
     public void setUpServos() {
         wobbleClaw = hardwareMap.servo.get("wobbleClaw");
-        retractor = hardwareMap.servo.get("retractor");
         loader = hardwareMap.servo.get("loader");
 
         //INIT SERVOS IN BEGINNING
-        wobbleClaw.setPosition(0);
-        retractor.setPosition(0);
+        wobbleClaw.setPosition(0); //THIS NEEDS TO BE THE BEGINNING POSITION OF THE SERVOS
         loader.setPosition(0);
     }
 
@@ -101,6 +97,9 @@ public class GamerOp extends OpMode {
         wobbleArm.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
 
+
+
+
     @Override
     //what runs in between robot being initialized and before it plays
     public void init_loop() {    }
@@ -113,42 +112,21 @@ public class GamerOp extends OpMode {
 
 
     @Override
-    public void loop() {
+    public void loop() { //main chunk of code that runs
         telemetry.update();
 
         //useEncoders();
         driveBot();
         intake();
         wobbler();
-        useEncoders();
+        //useEncoders();
         shooting();
 
 
         useOneGamepad();
     }
 
-    public void useEncoders() {
-        double parallelLeftTicks = (leftDead.getCurrentPosition() - baseParallelLeftPosition);
-        double parallelRightTicks = rightDead.getCurrentPosition() - baseParallelRightPosition;
-        double perpendicularTicks = perpDead.getCurrentPosition() - basePerpendicularPosition;
 
-        positionTracker.updateTicks(parallelLeftTicks, parallelRightTicks, perpendicularTicks);
-
-        if(Math.abs(gamepad1.left_stick_x) < Math.cos(Math.toRadians(5)) || Math.sqrt(Math.pow(gamepad1.left_stick_x,2) + Math.pow(gamepad1.left_stick_y,2)) < .1 ) {
-            positionTracker.updateLocationAndPose(telemetry, "");
-        }
-        else {
-            positionTracker.updateLocationAndPose(telemetry, "");
-        }
-
-        telemetry.addData("parallel left ticks", parallelLeftTicks);
-        telemetry.addData("parallel right ticks", parallelRightTicks);
-        telemetry.addData("perpendicular ticks", perpendicularTicks);
-        telemetry.addData("Distance traveled", (parallelLeftTicks + parallelRightTicks)*DEADWHEEL_INCHES_OVER_TICKS/2);
-        telemetry.addData("X Position", positionTracker.getCurrentX());
-        telemetry.addData("Y Position", positionTracker.getCurrentY());
-        telemetry.update();
-    }
 
     public void driveBot() {
         if (gamepad1.right_bumper && !precisionChanged) {
@@ -257,21 +235,6 @@ public class GamerOp extends OpMode {
             rampIntake.setPower(0);
         }
 
-        if((gamepad2.b && !retractorState && !retractorStateChanged)||(useOneGamepad && gamepad1.b && !retractorState && !retractorStateChanged)){
-            retractor.setPosition(1);
-            retractorState=!retractorState;
-            retractorStateChanged=true;
-        }
-        else if((gamepad2.b && retractorState && !retractorStateChanged)||(useOneGamepad && gamepad1.b && retractorState && !retractorStateChanged)){
-            retractor.setPosition(0);
-            retractorState=!retractorState;
-        }
-        else if((!gamepad2.b && retractorStateChanged) ||(useOneGamepad && !gamepad1.b && retractorStateChanged)){
-            retractorStateChanged=false;
-        }
-
-
-
     }
 
     public void shooting(){
@@ -293,10 +256,6 @@ public class GamerOp extends OpMode {
         }
     }
 
-    public void lowerRetractor(){
-        retractor.setPosition(1);
-        retractorState=!retractorState;
-    }
 
 
     public void useOneGamepad() {
@@ -306,8 +265,33 @@ public class GamerOp extends OpMode {
     }
 
 
+    public void useEncoders() {
+        double parallelLeftTicks = (leftDead.getCurrentPosition() - baseParallelLeftPosition);
+        double parallelRightTicks = rightDead.getCurrentPosition() - baseParallelRightPosition;
+        double perpendicularTicks = perpDead.getCurrentPosition() - basePerpendicularPosition;
+
+        positionTracker.updateTicks(parallelLeftTicks, parallelRightTicks, perpendicularTicks);
+
+        if (Math.abs(gamepad1.left_stick_x) < Math.cos(Math.toRadians(5)) || Math.sqrt(Math.pow(gamepad1.left_stick_x, 2) + Math.pow(gamepad1.left_stick_y, 2)) < .1) {
+            positionTracker.updateLocationAndPose(telemetry, "");
+        } else {
+            positionTracker.updateLocationAndPose(telemetry, "");
+        }
+
+        telemetry.addData("parallel left ticks", parallelLeftTicks);
+        telemetry.addData("parallel right ticks", parallelRightTicks);
+        telemetry.addData("perpendicular ticks", perpendicularTicks);
+        telemetry.addData("Distance traveled", (parallelLeftTicks + parallelRightTicks) * DEADWHEEL_INCHES_OVER_TICKS / 2);
+        telemetry.addData("X Position", positionTracker.getCurrentX());
+        telemetry.addData("Y Position", positionTracker.getCurrentY());
+        telemetry.update();
+    }
+
+
     @Override
     public void stop() {
 
     }
 }
+
+
